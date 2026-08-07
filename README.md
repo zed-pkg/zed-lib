@@ -90,12 +90,16 @@ Sibling checkouts, like the rest of the org:
 ```sh
 git clone https://github.com/zed-pkg/zed-interfaces
 git clone https://github.com/zed-pkg/zed-lib
-cd zed-lib && cargo test
+cd zed-lib
+
+cargo test                                        # Rust slice + corpus
+(cd src/dart && dart pub get && dart test)        # Dart slice + corpus
+(cd src/ts   && npm install && npm test)          # TypeScript slice + corpus
 ```
 
-The crate depends on `../zed-interfaces/src/rust` by path until
-`zed-interfaces` publishes `0.1.0` to the registry, at which point this becomes
-a plain version requirement.
+Every slice depends on its `zed-interfaces` counterpart by path until
+`zed-interfaces` publishes `0.1.0`, at which point each becomes a plain version
+requirement.
 
 ## License
 
