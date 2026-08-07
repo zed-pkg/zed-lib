@@ -148,7 +148,7 @@ const _pep440Labels = <String, ({String label, bool prerelease})>{
 /// `1.2.3+post.1` (semver has no "after the release" ordering). Conservative:
 /// only the common shapes, null otherwise.
 String? _normalizePep440(String raw) {
-  var input = (raw.startsWith('v') ? raw.substring(1) : raw).toLowerCase();
+  final input = (raw.startsWith('v') ? raw.substring(1) : raw).toLowerCase();
   final marker = input.indexOf(RegExp('[a-z]'));
   if (marker < 0) return null;
   var release = input.substring(0, marker);
