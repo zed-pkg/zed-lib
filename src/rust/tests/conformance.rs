@@ -88,7 +88,7 @@ fn metadata(case: &Case, latest_is_data: bool) -> PackageMetadata {
 }
 
 fn check_resolution(case: &Case, file: &str) {
-    let meta = metadata(case);
+    let meta = metadata(case, false);
     let requirement = case
         .requirement
         .as_deref()
@@ -113,7 +113,7 @@ fn check_latest(case: &Case, file: &str) {
         "{file}:{}: latest-stable cases cannot fail, they return null",
         case.name
     );
-    let meta = metadata(case);
+    let meta = metadata(case, true);
     assert_eq!(
         latest_stable(&meta),
         case.expect.version.as_deref(),
