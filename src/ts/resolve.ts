@@ -93,7 +93,8 @@ export function latestStable(metadata: PackageMetadata): string | null {
   for (const version of metadata.versions) {
     const parsed = parseVersion(version);
     if (!parsed || !isStable(parsed)) continue;
-    if (bestParsed === null || compareVersions(parsed, bestParsed) > 0) {
+    // Ties go to the last equal element, matching Rust's `Iterator::max_by`.
+    if (bestParsed === null || compareVersions(parsed, bestParsed) >= 0) {
       best = version;
       bestParsed = parsed;
     }

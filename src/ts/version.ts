@@ -236,7 +236,11 @@ function partial(raw: string): Partial | null {
       wildcard = true;
       break;
     }
-    if (!/^\d+$/.test(segment)) return null;
+    // Semver forbids leading zeros in numeric identifiers, and Cargo's
+    // requirement parser enforces it: `2026.07.24` is not a range at all, it is
+    // an exact tag. Accepting it here would turn a calendar tag into a caret
+    // range and, for an opaque package, into a spurious `invalid_requirement`.
+    if (!/^\d+$/.test(segment) || (segment.length > 1 && segment.startsWith("0"))) return null;
     parts.push(Number(segment));
   }
   if (parts.length > 3) return null;
@@ -326,9 +330,13 @@ function expand(token: string): VersionBound[] | null {
 function parseBounds(input: string): VersionBound[] | null {
   const trimmed = input.trim();
   if (trimmed === "") return null;
+  // `>= 1.0.0, < 2.0.0` is legal — Cargo allows space between an operator and
+  // its version. Glue them back together before splitting, or the operator
+  // becomes its own token and the whole requirement reads as an opaque tag.
+  const glued = trimmed.replace(/(\^|~|>=|<=|>|<|=)\s+/g, "$1");
   const comparators: VersionBound[] = [];
   let sawToken = false;
-  for (const token of trimmed.split(/\s*,\s*|\s+/)) {
+  for (const token of glued.split(/\s*,\s*|\s+/)) {
     if (token === "") continue;
     const expanded = expand(token);
     if (!expanded) return null;
@@ -373,7 +381,11 @@ export function resolveRequirement(
     const parsed = parseVersion(version);
     if (!parsed || !isStable(parsed)) continue;
     if (!requirementMatches(requirement, version)) continue;
-    if (bestParsed === null || compareVersions(parsed, bestParsed) > 0) {
+    // `>= 0`, not `> 0`: Rust resolves with `Iterator::max_by`, which returns
+    // the LAST maximum. Distinct spellings can parse to the same version
+    // (`1.2.3` and `1.2.3.post1`, `1.0.0` and `v1.0.0`), so the tie-break
+    // decides which spelling is installed.
+    if (bestParsed === null || compareVersions(parsed, bestParsed) >= 0) {
       best = version;
       bestParsed = parsed;
     }
