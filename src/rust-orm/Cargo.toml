@@ -1,0 +1,23 @@
+[package]
+name = "zed-orm"
+version = "0.1.0"
+edition = "2024"
+description = "Shared SeaORM data-access crate for the zed-pkg org: role-aware connections, the zed_pkg schema namespace, and named query functions"
+license = "MIT"
+repository = "https://github.com/zed-pkg/zed-lib"
+
+# Same slice layout as `src/rust`: the manifest sits inside its own slice so
+# `.zpkg.toml` can publish it as its own target (a target may not own
+# `dir = "."`).
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# SeaORM is the only direct data-layer dependency, per
+# SERVICE_AND_DATA_ARCHITECTURE.md. Its `sqlx-postgres` feature is the driver;
+# no direct `sqlx` dependency is permitted anywhere in the org.
+sea-orm = { version = "1", features = [
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
