@@ -13,8 +13,10 @@ void main() {
   test('importing zed_lib does not shadow dart:core types', () {
     // Every one of these would fail to compile if the package exported a type
     // with the same name; the test passing *is* the assertion.
-    final Comparator<int> byValue = (a, b) => a.compareTo(b);
-    final sorted = [3, 1, 2]..sort(byValue);
+    int byValue(int a, int b) => a.compareTo(b);
+    // The type annotation is the point: it must resolve to dart:core's.
+    final Comparator<int> comparator = byValue;
+    final sorted = [3, 1, 2]..sort(comparator);
     expect(sorted, [1, 2, 3]);
 
     const duration = Duration(seconds: 1);
