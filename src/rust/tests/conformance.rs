@@ -63,14 +63,24 @@ fn corpus_files() -> Vec<PathBuf> {
     files
 }
 
-fn metadata(case: &Case) -> PackageMetadata {
+/// `latest` is *data* for a latest-stable case — including when it is null,
+/// which is what "the registry recorded nothing" looks like. Falling back to
+/// the newest version there would quietly answer a different question than the
+/// case asked. Resolution cases never read the field, so they get the
+/// convenient fallback.
+fn metadata(case: &Case, latest_is_data: bool) -> PackageMetadata {
+    let latest = if latest_is_data {
+        case.latest.clone()
+    } else {
+        case.latest.clone().or_else(|| case.versions.last().cloned())
+    };
     PackageMetadata {
         org: "acme".to_string(),
         name: "conformance".to_string(),
         vcs: Vcs::Git,
         repo_url: "https://github.com/acme/conformance".to_string(),
         description: None,
-        latest: case.latest.clone().or_else(|| case.versions.last().cloned()),
+        latest,
         versions: case.versions.clone(),
         version_scheme: VersionScheme::from_str_lenient(&case.scheme),
         tags: Vec::new(),
