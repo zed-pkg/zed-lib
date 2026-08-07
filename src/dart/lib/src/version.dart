@@ -336,29 +336,43 @@ SemVer _tildeUpper(List<int> parts) => switch (parts.length) {
 List<Comparator>? _parseComparators(String input) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return null;
-  if (trimmed == '*') return const [];
 
   final comparators = <Comparator>[];
+  var sawToken = false;
   for (final token in trimmed.split(RegExp(r'\s*,\s*|\s+'))) {
     if (token.isEmpty) continue;
     final expanded = _expand(token);
     if (expanded == null) return null;
+    sawToken = true;
     comparators.addAll(expanded);
   }
-  return comparators.isEmpty ? null : comparators;
+  // `*` is a legitimate range that constrains nothing, so emptiness cannot
+  // double as the failure signal.
+  return sawToken ? comparators : null;
 }
 
 List<Comparator>? _expand(String token) {
-  if (token == '*') return const [];
-
   final match = RegExp(r'^(\^|~|>=|<=|>|<|=)?\s*(.+)$').firstMatch(token);
   if (match == null) return null;
-  final op = match.group(1) ?? '^'; // Cargo: a bare version is a caret range.
+  final explicitOp = match.group(1);
+  final op = explicitOp ?? '^'; // Cargo: a bare version is a caret range.
   final rest = match.group(2)!.trim();
   final partial = _partial(rest);
   if (partial == null) return null;
   final parts = partial.parts;
   final pre = partial.pre;
+
+  if (parts.isEmpty) return const []; // bare `*`/`x`: matches anything
+
+  // An explicit wildcard binds tighter than an omitted segment: `1.2` is
+  // `^1.2` (< 2.0.0), but `1.2.*` is the 1.2 line (< 1.3.0). With an operator
+  // the wildcard is just the segments the author left off (`^1.*` == `^1`).
+  if (partial.wildcard && explicitOp == null) {
+    return [
+      Comparator('>=', _atLeast(parts, pre)),
+      Comparator('<', _tildeUpper(parts)),
+    ];
+  }
 
   switch (op) {
     case '^':
@@ -372,7 +386,7 @@ List<Comparator>? _expand(String token) {
         Comparator('<', _tildeUpper(parts)),
       ];
     case '=':
-      // `=1.2` is not "exactly 1.2.0" in Cargo, it is the 1.2.x line.
+      // `=1.2` is not "exactly 1.2.0" in Cargo, it is the 1.2 line.
       if (parts.length == 3) return [Comparator('=', _atLeast(parts, pre))];
       return [
         Comparator('>=', _atLeast(parts, pre)),
