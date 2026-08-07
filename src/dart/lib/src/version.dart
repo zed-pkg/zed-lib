@@ -201,8 +201,8 @@ SemVer? parseVersion(String raw) {
 }
 
 /// One `<op><version>` bound.
-class Comparator {
-  const Comparator(this.op, this.version);
+class VersionBound {
+  const VersionBound(this.op, this.version);
 
   final String op;
   final SemVer version;
@@ -253,7 +253,7 @@ class ExactRequirement extends Requirement {
 class RangeRequirement extends Requirement {
   const RangeRequirement(this.comparators);
 
-  final List<Comparator> comparators;
+  final List<VersionBound> comparators;
 
   @override
   bool matches(String version) {
@@ -333,11 +333,11 @@ SemVer _tildeUpper(List<int> parts) => switch (parts.length) {
   _ => SemVer(parts[0], parts[1] + 1, 0),
 };
 
-List<Comparator>? _parseComparators(String input) {
+List<VersionBound>? _parseComparators(String input) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return null;
 
-  final comparators = <Comparator>[];
+  final comparators = <VersionBound>[];
   var sawToken = false;
   for (final token in trimmed.split(RegExp(r'\s*,\s*|\s+'))) {
     if (token.isEmpty) continue;
@@ -351,7 +351,7 @@ List<Comparator>? _parseComparators(String input) {
   return sawToken ? comparators : null;
 }
 
-List<Comparator>? _expand(String token) {
+List<VersionBound>? _expand(String token) {
   final match = RegExp(r'^(\^|~|>=|<=|>|<|=)?\s*(.+)$').firstMatch(token);
   if (match == null) return null;
   final explicitOp = match.group(1);
@@ -369,38 +369,38 @@ List<Comparator>? _expand(String token) {
   // the wildcard is just the segments the author left off (`^1.*` == `^1`).
   if (partial.wildcard && explicitOp == null) {
     return [
-      Comparator('>=', _atLeast(parts, pre)),
-      Comparator('<', _tildeUpper(parts)),
+      VersionBound('>=', _atLeast(parts, pre)),
+      VersionBound('<', _tildeUpper(parts)),
     ];
   }
 
   switch (op) {
     case '^':
       return [
-        Comparator('>=', _atLeast(parts, pre)),
-        Comparator('<', _caretUpper(parts)),
+        VersionBound('>=', _atLeast(parts, pre)),
+        VersionBound('<', _caretUpper(parts)),
       ];
     case '~':
       return [
-        Comparator('>=', _atLeast(parts, pre)),
-        Comparator('<', _tildeUpper(parts)),
+        VersionBound('>=', _atLeast(parts, pre)),
+        VersionBound('<', _tildeUpper(parts)),
       ];
     case '=':
       // `=1.2` is not "exactly 1.2.0" in Cargo, it is the 1.2 line.
-      if (parts.length == 3) return [Comparator('=', _atLeast(parts, pre))];
+      if (parts.length == 3) return [VersionBound('=', _atLeast(parts, pre))];
       return [
-        Comparator('>=', _atLeast(parts, pre)),
-        Comparator('<', _tildeUpper(parts)),
+        VersionBound('>=', _atLeast(parts, pre)),
+        VersionBound('<', _tildeUpper(parts)),
       ];
     default:
-      return [Comparator(op, _atLeast(parts, pre))];
+      return [VersionBound(op, _atLeast(parts, pre))];
   }
 }
 
 /// Pick the version satisfying `requirement`, returned in its **published
 /// spelling** so the store address and VCS tag stay faithful to the tag the
 /// publisher pushed. Prereleases never satisfy a range.
-String? resolve(Requirement requirement, List<String> versions) {
+String? resolveRequirement(Requirement requirement, List<String> versions) {
   switch (requirement) {
     case ExactRequirement(:final tag):
       for (final version in versions) {

@@ -82,7 +82,7 @@ String resolveVersion(PackageMetadata metadata, String requirement) {
     );
   }
 
-  final resolved = resolve(parsed, metadata.versions);
+  final resolved = resolveRequirement(parsed, metadata.versions);
   if (resolved == null) {
     throw ResolveException(
       ResolveErrorKind.unsatisfied,
