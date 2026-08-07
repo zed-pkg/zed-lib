@@ -367,6 +367,7 @@ dependencies = [
 name = "zed-lib"
 version = "0.1.0"
 dependencies = [
+ "semver",
  "serde",
  "serde_json",
  "thiserror",

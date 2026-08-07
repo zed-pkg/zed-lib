@@ -272,9 +272,14 @@ bool looksLikeRange(String input) =>
     input.contains(',') ||
     input.trim().split(RegExp(r'\s+')).length > 1;
 
-/// Split a numeric-ish version into 1–3 parts plus an optional prerelease,
-/// so `1.2` and `2026` can expand into full bounds.
-({List<int> parts, List<String> pre})? _partial(String raw) {
+/// Split a numeric-ish version into 1–3 parts plus an optional prerelease, so
+/// `1.2` and `2026` can expand into full bounds.
+///
+/// `*`, `x`, and `X` are all wildcards, and a wildcard must be the **last**
+/// segment — `1.x.y` is an error, not `1.x`. That is the rule Cargo's `semver`
+/// enforces ("unexpected character after wildcard"), and it is why `^1.x.y` is
+/// an invalid requirement rather than a very wide one.
+({List<int> parts, List<String> pre, bool wildcard})? _partial(String raw) {
   var input = raw.startsWith('v') ? raw.substring(1) : raw;
   input = input.split('+').first;
   List<String> pre = const [];
@@ -285,17 +290,23 @@ bool looksLikeRange(String input) =>
   }
   if (input.isEmpty) return null;
   final parts = <int>[];
-  for (final segment in input.split('.')) {
-    // `1.*` means "unbounded from here"; stop and let the caller widen,
-    // exactly as a missing segment would. `x`/`X` are npm's spelling, not
-    // Cargo's — `1.x` is an opaque tag here, and `^1.x.y` is a typo.
-    if (segment == '*') break;
+  var wildcard = false;
+  final segments = input.split('.');
+  for (var i = 0; i < segments.length; i++) {
+    final segment = segments[i];
+    if (segment == '*' || segment == 'x' || segment == 'X') {
+      if (i != segments.length - 1 || parts.length >= 3) return null;
+      wildcard = true;
+      break;
+    }
     final value = int.tryParse(segment);
     if (value == null) return null;
     parts.add(value);
   }
-  if (parts.isEmpty || parts.length > 3) return null;
-  return (parts: parts, pre: pre);
+  if (parts.length > 3) return null;
+  // A bare `*` constrains nothing; anything else needs at least one number.
+  if (parts.isEmpty && !wildcard) return null;
+  return (parts: parts, pre: pre, wildcard: wildcard);
 }
 
 SemVer _atLeast(List<int> parts, List<String> pre) => SemVer(
