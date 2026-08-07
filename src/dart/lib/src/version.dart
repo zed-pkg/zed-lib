@@ -337,6 +337,14 @@ List<VersionBound>? _parseComparators(String input) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return null;
 
+  // `>= 1.0.0, < 2.0.0` is legal — Cargo allows space between an operator and
+  // its version. Glue them back together before splitting, or the operator
+  // becomes its own token and the whole requirement reads as an opaque tag.
+  final glued = trimmed.replaceAllMapped(
+    RegExp(r'(\^|~|>=|<=|>|<|=)\s+'),
+    (match) => match[1]!,
+  );
+
   final comparators = <VersionBound>[];
   var sawToken = false;
   for (final token in trimmed.split(RegExp(r'\s*,\s*|\s+'))) {
