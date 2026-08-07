@@ -109,7 +109,8 @@ String? latestStable(PackageMetadata metadata) {
   for (final version in metadata.versions) {
     final parsed = parseVersion(version);
     if (parsed == null || !parsed.isStable) continue;
-    if (bestParsed == null || parsed.compareTo(bestParsed) > 0) {
+    // Ties go to the last equal element, matching Rust's `Iterator::max_by`.
+    if (bestParsed == null || parsed.compareTo(bestParsed) >= 0) {
       best = version;
       bestParsed = parsed;
     }

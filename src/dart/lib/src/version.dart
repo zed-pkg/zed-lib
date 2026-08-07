@@ -299,6 +299,11 @@ bool looksLikeRange(String input) =>
       wildcard = true;
       break;
     }
+    // Semver forbids leading zeros in numeric identifiers, and Cargo's
+    // requirement parser enforces it: `2026.07.24` is not a range at all, it is
+    // an exact tag. Accepting it here would turn a calendar tag into a caret
+    // range and, for an opaque package, into a spurious `invalid_requirement`.
+    if (segment.length > 1 && segment.startsWith('0')) return null;
     final value = int.tryParse(segment);
     if (value == null) return null;
     parts.add(value);
@@ -347,7 +352,7 @@ List<VersionBound>? _parseComparators(String input) {
 
   final comparators = <VersionBound>[];
   var sawToken = false;
-  for (final token in trimmed.split(RegExp(r'\s*,\s*|\s+'))) {
+  for (final token in glued.split(RegExp(r'\s*,\s*|\s+'))) {
     if (token.isEmpty) continue;
     final expanded = _expand(token);
     if (expanded == null) return null;
@@ -422,7 +427,11 @@ String? resolveRequirement(Requirement requirement, List<String> versions) {
         final parsed = parseVersion(version);
         if (parsed == null || !parsed.isStable) continue;
         if (!requirement.matches(version)) continue;
-        if (bestParsed == null || parsed.compareTo(bestParsed) > 0) {
+        // `>= 0`, not `> 0`: Rust resolves with `Iterator::max_by`, which
+        // returns the LAST maximum. Distinct spellings can parse to the same
+        // version (`1.2.3` and `1.2.3.post1`, `1.0.0` and `v1.0.0`), so the
+        // tie-break decides which spelling is installed.
+        if (bestParsed == null || parsed.compareTo(bestParsed) >= 0) {
           best = version;
           bestParsed = parsed;
         }
