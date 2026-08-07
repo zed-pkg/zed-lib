@@ -59,17 +59,38 @@
       "expect": { "error": "invalid_requirement" }
     },
     {
-      "name": "`*` is the wildcard in this dialect",
+      "name": "an explicit wildcard binds tighter than an omitted segment",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.9.0", "2.0.0"],
-      "requirement": "1.*",
+      "versions": ["1.0.0", "1.2.0", "1.2.9", "1.9.0", "2.0.0"],
+      "requirement": "1.2.*",
+      "expect": { "version": "1.2.9" }
+    },
+    {
+      "name": "the same requirement with the segment omitted is a caret range",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.2.0", "1.2.9", "1.9.0", "2.0.0"],
+      "requirement": "1.2",
       "expect": { "version": "1.9.0" }
     },
     {
-      "name": "`x` is npm's wildcard, not this dialect's — it is an opaque tag",
+      "name": "`x` and `X` are wildcards too, not opaque tags",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.9.0", "2.0.0"],
+      "requirement": "1.x",
+      "expect": { "version": "1.9.0" }
+    },
+    {
+      "name": "a bare wildcard matches the newest stable version",
+      "scheme": "semver",
+      "versions": ["1.0.0", "2.0.0", "2.1.0-rc.1"],
+      "requirement": "*",
+      "expect": { "version": "2.0.0" }
+    },
+    {
+      "name": "KNOWN GAP: a wildcard typo with no operator degrades to an opaque tag",
       "scheme": "semver",
       "versions": ["1.0.0", "1.9.0"],
-      "requirement": "1.x",
+      "requirement": "1.x.y",
       "expect": { "error": "unsatisfied" }
     },
     {
