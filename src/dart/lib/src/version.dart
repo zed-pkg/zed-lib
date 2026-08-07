@@ -286,9 +286,10 @@ bool looksLikeRange(String input) =>
   if (input.isEmpty) return null;
   final parts = <int>[];
   for (final segment in input.split('.')) {
-    // `1.*` and `1.x` mean "unbounded from here"; stop and let the caller
-    // widen, exactly as a missing segment would.
-    if (segment == '*' || segment == 'x' || segment == 'X') break;
+    // `1.*` means "unbounded from here"; stop and let the caller widen,
+    // exactly as a missing segment would. `x`/`X` are npm's spelling, not
+    // Cargo's — `1.x` is an opaque tag here, and `^1.x.y` is a typo.
+    if (segment == '*') break;
     final value = int.tryParse(segment);
     if (value == null) return null;
     parts.add(value);
