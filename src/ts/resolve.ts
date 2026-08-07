@@ -12,12 +12,15 @@ export type ResolveErrorKind = "no_versions" | "invalid_requirement" | "unsatisf
 /** Why a requirement did not resolve. The three cases need different fixes, so
  *  they stay distinct rather than collapsing into null. */
 export class ResolveError extends Error {
-  constructor(
-    readonly kind: ResolveErrorKind,
-    message: string,
-  ) {
+  // Declared as a field rather than a constructor parameter property: those
+  // are not erasable, and this package is consumed straight from source by
+  // Node's type-stripping and by bundlers.
+  readonly kind: ResolveErrorKind;
+
+  constructor(kind: ResolveErrorKind, message: string) {
     super(message);
     this.name = "ResolveError";
+    this.kind = kind;
   }
 }
 
