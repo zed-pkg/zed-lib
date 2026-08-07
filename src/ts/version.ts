@@ -165,14 +165,14 @@ export function parseVersion(raw: string): SemVer | null {
 export type Op = "=" | ">" | ">=" | "<" | "<=";
 
 /** One `<op><version>` bound. */
-export interface Comparator {
+export interface VersionBound {
   readonly op: Op;
   readonly version: SemVer;
 }
 
-function matchesComparator(comparator: Comparator, candidate: SemVer): boolean {
-  const ordering = compareVersions(candidate, comparator.version);
-  switch (comparator.op) {
+function matchesBound(bound: VersionBound, candidate: SemVer): boolean {
+  const ordering = compareVersions(candidate, bound.version);
+  switch (bound.op) {
     case "=":
       return ordering === 0;
     case ">":
@@ -189,7 +189,7 @@ function matchesComparator(comparator: Comparator, candidate: SemVer): boolean {
 /** A requirement is either a range (semver algebra) or an exact tag. An opaque
  *  package's requirement is always the latter. */
 export type Requirement =
-  | { readonly kind: "range"; readonly comparators: readonly Comparator[] }
+  | { readonly kind: "range"; readonly comparators: readonly VersionBound[] }
   | { readonly kind: "exact"; readonly tag: string };
 
 /** Does this string *look* like a range? Tells a typo (`^1.x.y`) from a
@@ -279,7 +279,7 @@ function tildeUpper(parts: readonly number[]): SemVer {
 
 const OP_RE = /^(\^|~|>=|<=|>|<|=)?\s*(.+)$/;
 
-function expand(token: string): Comparator[] | null {
+function expand(token: string): VersionBound[] | null {
   const match = OP_RE.exec(token);
   if (!match) return null;
   const explicitOp = match[1];
@@ -323,10 +323,10 @@ function expand(token: string): Comparator[] | null {
   }
 }
 
-function parseComparators(input: string): Comparator[] | null {
+function parseBounds(input: string): VersionBound[] | null {
   const trimmed = input.trim();
   if (trimmed === "") return null;
-  const comparators: Comparator[] = [];
+  const comparators: VersionBound[] = [];
   let sawToken = false;
   for (const token of trimmed.split(/\s*,\s*|\s+/)) {
     if (token === "") continue;
@@ -344,7 +344,7 @@ function parseComparators(input: string): Comparator[] | null {
  *  `=1.2.3` pins one version. Anything that is not a legible range becomes an
  *  exact tag, which is how opaque versions are requested. */
 export function parseRequirement(input: string): Requirement {
-  const comparators = parseComparators(input);
+  const comparators = parseBounds(input);
   return comparators === null
     ? { kind: "exact", tag: input }
     : { kind: "range", comparators };
@@ -354,13 +354,13 @@ export function requirementMatches(requirement: Requirement, version: string): b
   if (requirement.kind === "exact") return version === requirement.tag;
   const parsed = parseVersion(version);
   if (!parsed) return false;
-  return requirement.comparators.every((c) => matchesComparator(c, parsed));
+  return requirement.comparators.every((bound) => matchesBound(bound, parsed));
 }
 
 /** Pick the version satisfying `requirement`, returned in its **published
  *  spelling** so the store address and VCS tag stay faithful to the tag the
  *  publisher pushed. Prereleases never satisfy a range. */
-export function resolve(
+export function resolveRequirement(
   requirement: Requirement,
   versions: readonly string[],
 ): string | null {
