@@ -33,25 +33,28 @@ export function schemeOf(metadata: PackageMetadata): VersionScheme {
   return metadata.version_scheme ?? "semver";
 }
 
-/** Detect a dotted numeric-leading requirement that retains semver-like shape
- *  after a wildcard. `1.x.y` is a malformed range, not an opaque exact tag;
- *  `1.nginx` and `1.x86_64` remain legitimate exact tags. */
-function looksLikeDottedNumericRequirement(input: string): boolean {
+/** Detect only malformed dotted numeric requirements that the parser demotes
+ *  to exact tags. A wildcard followed by another segment is a typo, and more
+ *  than three all-numeric components are not semver. `2026.07.24`, `1.nginx`,
+ *  and `1.x86_64` remain exact tags. */
+function looksLikeMalformedDottedNumericRequirement(input: string): boolean {
   const segments = input.split(".");
   if (segments.length < 2 || !/^\d+$/.test(segments[0] as string)) return false;
 
+  let allNumeric = true;
   let sawWildcard = false;
   for (const segment of segments.slice(1)) {
-    if (segment === "") return false;
+    if (sawWildcard) return true;
     if (segment === "x" || segment === "X" || segment === "*") {
       sawWildcard = true;
+      allNumeric = false;
       continue;
     }
+    if (segment === "") return false;
     if (/^\d+$/.test(segment)) continue;
-    if (sawWildcard && /^[A-Za-z]+$/.test(segment)) continue;
     return false;
   }
-  return true;
+  return allNumeric && segments.length > 3;
 }
 
 /** Resolve `requirement` against what the registry says a package published.
@@ -79,12 +82,12 @@ export function resolveVersion(metadata: PackageMetadata, requirement: string): 
   }
 
   // A range that looks like one but does not parse (`^1.x.y`, `1.x.y`, or
-  // `1.2.3.4`) would degrade into an exact tag and never match. Catch the typo
-  // without treating ordinary numeric-prefixed opaque tags as ranges.
+  // `1.2.3.4`) would degrade into an exact tag and never match. Catch only the
+  // malformed range shapes, without reclassifying calendar or opaque tags.
   if (
     scheme !== "opaque" &&
     parsed.kind === "exact" &&
-    (looksLikeRange(requirement) || looksLikeDottedNumericRequirement(requirement))
+    (looksLikeRange(requirement) || looksLikeMalformedDottedNumericRequirement(requirement))
   ) {
     throw new ResolveError(
       "invalid_requirement",
