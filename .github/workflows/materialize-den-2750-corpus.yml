@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EXPECTED_PARENT: bd2d5e5b6453486fcc302b5f21dac2b8e4cbc7a3
+  EXPECTED_PARENT: d56b681b5cedef98e08a50a4b114c73eccaed1e5
   ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
 
 jobs:
@@ -56,8 +56,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24.5.0"
-          cache: npm
-          cache-dependency-path: zed-lib/src/ts/package-lock.json
 
       - name: Verify exact source and sibling pins
         shell: bash
