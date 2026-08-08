@@ -33,6 +33,27 @@ export function schemeOf(metadata: PackageMetadata): VersionScheme {
   return metadata.version_scheme ?? "semver";
 }
 
+/** Detect a dotted numeric-leading requirement that retains semver-like shape
+ *  after a wildcard. `1.x.y` is a malformed range, not an opaque exact tag;
+ *  `1.nginx` and `1.x86_64` remain legitimate exact tags. */
+function looksLikeDottedNumericRequirement(input: string): boolean {
+  const segments = input.split(".");
+  if (segments.length < 2 || !/^\d+$/.test(segments[0] as string)) return false;
+
+  let sawWildcard = false;
+  for (const segment of segments.slice(1)) {
+    if (segment === "") return false;
+    if (segment === "x" || segment === "X" || segment === "*") {
+      sawWildcard = true;
+      continue;
+    }
+    if (/^\d+$/.test(segment)) continue;
+    if (sawWildcard && /^[A-Za-z]+$/.test(segment)) continue;
+    return false;
+  }
+  return true;
+}
+
 /** Resolve `requirement` against what the registry says a package published.
  *
  *  Returns the version in its published spelling. Under the `opaque` scheme the
@@ -57,13 +78,18 @@ export function resolveVersion(metadata: PackageMetadata, requirement: string): 
     );
   }
 
-  // A range that *looks* like one but does not parse (`^1.x.y`) would degrade
-  // into an exact tag and never match. Catch it as the typo it is.
-  if (scheme !== "opaque" && parsed.kind === "exact" && looksLikeRange(requirement)) {
+  // A range that looks like one but does not parse (`^1.x.y`, `1.x.y`, or
+  // `1.2.3.4`) would degrade into an exact tag and never match. Catch the typo
+  // without treating ordinary numeric-prefixed opaque tags as ranges.
+  if (
+    scheme !== "opaque" &&
+    parsed.kind === "exact" &&
+    (looksLikeRange(requirement) || looksLikeDottedNumericRequirement(requirement))
+  ) {
     throw new ResolveError(
       "invalid_requirement",
       `\`${requirement}\` is not a valid requirement for ${id}: looks like a version ` +
-        `range but is not a valid one`,
+        `range but has an invalid wildcard or segment shape`,
     );
   }
 
