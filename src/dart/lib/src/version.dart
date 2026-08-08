@@ -270,7 +270,38 @@ bool looksLikeRange(String input) =>
     input.startsWith(RegExp(r'[\^~><=]')) ||
     input.contains('*') ||
     input.contains(',') ||
-    input.trim().split(RegExp(r'\s+')).length > 1;
+    input.trim().split(RegExp(r'\s+')).length > 1 ||
+    _looksLikeMalformedDottedNumeric(input);
+
+/// Mirrors `looks_like_malformed_dotted_numeric_requirement` in
+/// `zed_interfaces::version` (DEN-2750).
+///
+/// Catches the dotted typos the semver parser quietly demotes to exact tags —
+/// a wildcard with anything after it (`1.x.y`), or more than three all-numeric
+/// components — **without** reclassifying a calendar-like exact tag
+/// (`2026.07.24`, three numeric segments) or a numeric-prefixed opaque tag
+/// (`1.nginx`, `1.x86_64`), both of which stay exact.
+bool _looksLikeMalformedDottedNumeric(String input) {
+  final segments = input.split('.');
+  final first = segments.first;
+  if (first.isEmpty || !first.split('').every((c) => '0123456789'.contains(c))) {
+    return false;
+  }
+  var allNumeric = true;
+  var sawWildcard = false;
+  for (final segment in segments.skip(1)) {
+    if (sawWildcard) return true;
+    if (segment == 'x' || segment == 'X' || segment == '*') {
+      sawWildcard = true;
+      allNumeric = false;
+      continue;
+    }
+    if (segment.isEmpty) return false;
+    if (segment.split('').every((c) => '0123456789'.contains(c))) continue;
+    return false;
+  }
+  return allNumeric && segments.length > 3;
+}
 
 /// Split a numeric-ish version into 1–3 parts plus an optional prerelease, so
 /// `1.2` and `2026` can expand into full bounds.

@@ -200,8 +200,36 @@ export function looksLikeRange(input: string): boolean {
     /^[\^~><=]/.test(input) ||
     input.includes("*") ||
     input.includes(",") ||
-    input.trim().split(/\s+/).length > 1
+    input.trim().split(/\s+/).length > 1 ||
+    looksLikeMalformedDottedNumeric(input)
   );
+}
+
+/** Mirrors `looks_like_malformed_dotted_numeric_requirement` in
+ *  `zed_interfaces::version` (DEN-2750).
+ *
+ *  Catches the dotted typos the semver parser quietly demotes to exact tags —
+ *  a wildcard with anything after it (`1.x.y`), or more than three all-numeric
+ *  components — without reclassifying a calendar-like exact tag (`2026.07.24`)
+ *  or a numeric-prefixed opaque tag (`1.nginx`, `1.x86_64`). */
+function looksLikeMalformedDottedNumeric(input: string): boolean {
+  const segments = input.split(".");
+  const first = segments[0] as string;
+  if (first === "" || !/^\d+$/.test(first)) return false;
+  let allNumeric = true;
+  let sawWildcard = false;
+  for (const segment of segments.slice(1)) {
+    if (sawWildcard) return true;
+    if (segment === "x" || segment === "X" || segment === "*") {
+      sawWildcard = true;
+      allNumeric = false;
+      continue;
+    }
+    if (segment === "") return false;
+    if (/^\d+$/.test(segment)) continue;
+    return false;
+  }
+  return allNumeric && segments.length > 3;
 }
 
 interface Partial {
