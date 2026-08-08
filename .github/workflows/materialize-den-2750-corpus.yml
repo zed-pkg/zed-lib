@@ -1,0 +1,147 @@
+name: materialize DEN-2750 cross-language corpus
+
+on:
+  push:
+    branches:
+      - codex/den-2750-flip-wildcard-conformance-case
+    paths:
+      - .github/workflows/materialize-den-2750-corpus.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-den-2750-corpus
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: bd2d5e5b6453486fcc302b5f21dac2b8e4cbc7a3
+  ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
+
+jobs:
+  materialize:
+    name: format, regenerate, certify, and remove carrier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact zed-lib carrier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: zed-lib
+          fetch-depth: 2
+          persist-credentials: true
+          show-progress: false
+
+      - name: Check out immutable polyglot interfaces
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+          components: rustfmt,clippy
+
+      - name: Install pinned Dart SDK
+        uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
+
+      - name: Install pinned Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24.5.0"
+          cache: npm
+          cache-dependency-path: zed-lib/src/ts/package-lock.json
+
+      - name: Verify exact source and sibling pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C zed-lib rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test "$(git -C zed-lib diff --name-only HEAD^ HEAD)" = .github/workflows/materialize-den-2750-corpus.yml
+          test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
+
+      - name: Format Rust and regenerate deterministic corpus
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo run --locked --example generate_fuzz_corpus
+
+          python3 - <<'PY'
+          import subprocess
+
+          expected = {
+              'src/rust/resolve.rs',
+              'conformance/cases/fuzz-version-resolution.json',
+          }
+          changed = {
+              line.strip()
+              for line in subprocess.check_output(
+                  ['git', 'diff', '--name-only'], text=True
+              ).splitlines()
+              if line.strip()
+          }
+          if changed != expected:
+              raise SystemExit(
+                  'expected exactly formatted Rust plus regenerated resolution corpus; got: '
+                  + ', '.join(sorted(changed))
+              )
+          PY
+          git diff --check
+
+      - name: Certify Rust oracle and generated drift contract
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked --all-targets
+          cargo test --locked --test conformance
+          cp conformance/cases/fuzz-version-resolution.json "$RUNNER_TEMP/fuzz-before.json"
+          cp conformance/cases/fuzz-latest-stable.json "$RUNNER_TEMP/latest-before.json"
+          cargo run --locked --example generate_fuzz_corpus
+          cmp "$RUNNER_TEMP/fuzz-before.json" conformance/cases/fuzz-version-resolution.json
+          cmp "$RUNNER_TEMP/latest-before.json" conformance/cases/fuzz-latest-stable.json
+
+      - name: Certify Dart implementation
+        working-directory: zed-lib/src/dart
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart pub get
+          dart analyze --fatal-infos
+          dart test
+
+      - name: Certify TypeScript implementation
+        working-directory: zed-lib/src/ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install
+          npm install --no-save typescript@5 @types/node
+          npx tsc --noEmit
+          node --test conformance.test.ts
+
+      - name: Commit exact generated product files and remove carrier
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/materialize-den-2750-corpus.yml
+          changed="$(git diff --name-only HEAD)"
+          expected=$'.github/workflows/materialize-den-2750-corpus.yml\nconformance/cases/fuzz-version-resolution.json\nsrc/rust/resolve.rs'
+          test "$changed" = "$expected"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add conformance/cases/fuzz-version-resolution.json src/rust/resolve.rs
+          git commit -m "test(DEN-2750): regenerate wildcard conformance corpus"
+          git push origin HEAD:codex/den-2750-flip-wildcard-conformance-case
