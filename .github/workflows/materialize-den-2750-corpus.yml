@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EXPECTED_PARENT: d56b681b5cedef98e08a50a4b114c73eccaed1e5
+  EXPECTED_PARENT: 52fd52865a7ba2cc505ff091249b6ec2d72642e3
   ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
 
 jobs:
@@ -65,34 +65,18 @@ jobs:
           test "$(git -C zed-lib diff --name-only HEAD^ HEAD)" = .github/workflows/materialize-den-2750-corpus.yml
           test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
 
-      - name: Format Rust and regenerate deterministic corpus
+      - name: Format Rust and prove generated corpus is stable
         working-directory: zed-lib
         shell: bash
         run: |
           set -euo pipefail
+          cp conformance/cases/fuzz-version-resolution.json "$RUNNER_TEMP/fuzz-before.json"
+          cp conformance/cases/fuzz-latest-stable.json "$RUNNER_TEMP/latest-before.json"
           cargo fmt --all
           cargo run --locked --example generate_fuzz_corpus
-
-          python3 - <<'PY'
-          import subprocess
-
-          expected = {
-              'src/rust/resolve.rs',
-              'conformance/cases/fuzz-version-resolution.json',
-          }
-          changed = {
-              line.strip()
-              for line in subprocess.check_output(
-                  ['git', 'diff', '--name-only'], text=True
-              ).splitlines()
-              if line.strip()
-          }
-          if changed != expected:
-              raise SystemExit(
-                  'expected exactly formatted Rust plus regenerated resolution corpus; got: '
-                  + ', '.join(sorted(changed))
-              )
-          PY
+          cmp "$RUNNER_TEMP/fuzz-before.json" conformance/cases/fuzz-version-resolution.json
+          cmp "$RUNNER_TEMP/latest-before.json" conformance/cases/fuzz-latest-stable.json
+          test "$(git diff --name-only)" = src/rust/resolve.rs
           git diff --check
 
       - name: Certify Rust oracle and generated drift contract
@@ -104,11 +88,8 @@ jobs:
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked --all-targets
           cargo test --locked --test conformance
-          cp conformance/cases/fuzz-version-resolution.json "$RUNNER_TEMP/fuzz-before.json"
-          cp conformance/cases/fuzz-latest-stable.json "$RUNNER_TEMP/latest-before.json"
           cargo run --locked --example generate_fuzz_corpus
-          cmp "$RUNNER_TEMP/fuzz-before.json" conformance/cases/fuzz-version-resolution.json
-          cmp "$RUNNER_TEMP/latest-before.json" conformance/cases/fuzz-latest-stable.json
+          test "$(git diff --name-only)" = src/rust/resolve.rs
 
       - name: Certify Dart implementation
         working-directory: zed-lib/src/dart
@@ -129,17 +110,17 @@ jobs:
           npx tsc --noEmit
           node --test conformance.test.ts
 
-      - name: Commit exact generated product files and remove carrier
+      - name: Commit exact formatted source and remove carrier
         working-directory: zed-lib
         shell: bash
         run: |
           set -euo pipefail
           git rm .github/workflows/materialize-den-2750-corpus.yml
           changed="$(git diff --name-only HEAD)"
-          expected=$'.github/workflows/materialize-den-2750-corpus.yml\nconformance/cases/fuzz-version-resolution.json\nsrc/rust/resolve.rs'
+          expected=$'.github/workflows/materialize-den-2750-corpus.yml\nsrc/rust/resolve.rs'
           test "$changed" = "$expected"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add conformance/cases/fuzz-version-resolution.json src/rust/resolve.rs
-          git commit -m "test(DEN-2750): regenerate wildcard conformance corpus"
+          git add src/rust/resolve.rs
+          git commit -m "style(DEN-2750): format wildcard conformance resolver"
           git push origin HEAD:codex/den-2750-flip-wildcard-conformance-case
