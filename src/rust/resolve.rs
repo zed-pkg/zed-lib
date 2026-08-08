@@ -147,8 +147,9 @@ pub fn resolve_version<'a>(
                 org,
                 name,
                 requirement: requirement.to_string(),
-                reason: "looks like a dotted semver range but has an invalid wildcard or segment shape"
-                    .to_string(),
+                reason:
+                    "looks like a dotted semver range but has an invalid wildcard or segment shape"
+                        .to_string(),
             });
         }
     }
@@ -228,13 +229,7 @@ mod tests {
     fn malformed_dotted_ranges_are_requirement_errors_without_false_positives() {
         let meta = metadata(
             VersionScheme::Semver,
-            &[
-                "1.0.0",
-                "1.9.0",
-                "1.nginx",
-                "1.x86_64",
-                "2026.07.24",
-            ],
+            &["1.0.0", "1.9.0", "1.nginx", "1.x86_64", "2026.07.24"],
         );
         for requirement in ["^1.x.y", "1.x.y", "1.X.y", "1.*.y", "1.2.3.4"] {
             assert_eq!(
@@ -246,10 +241,7 @@ mod tests {
         assert_eq!(resolve_version(&meta, "1.x").unwrap(), "1.9.0");
         assert_eq!(resolve_version(&meta, "1.nginx").unwrap(), "1.nginx");
         assert_eq!(resolve_version(&meta, "1.x86_64").unwrap(), "1.x86_64");
-        assert_eq!(
-            resolve_version(&meta, "2026.07.24").unwrap(),
-            "2026.07.24"
-        );
+        assert_eq!(resolve_version(&meta, "2026.07.24").unwrap(), "2026.07.24");
         assert_eq!(
             resolve_version(&meta, "^9.0").unwrap_err().kind(),
             "unsatisfied"
