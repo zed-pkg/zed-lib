@@ -154,7 +154,7 @@
       }
     },
     {
-      "name": "KNOWN GAP: a wildcard typo with no operator degrades to an opaque tag",
+      "name": "a wildcard typo with no operator is a requirement error",
       "scheme": "semver",
       "versions": [
         "1.0.0",
@@ -162,7 +162,7 @@
       ],
       "requirement": "1.x.y",
       "expect": {
-        "error": "unsatisfied"
+        "error": "invalid_requirement"
       }
     },
     {
