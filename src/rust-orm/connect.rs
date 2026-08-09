@@ -1,38 +1,23 @@
-//! Role-aware connection construction for the shared `zed_pkg` schema.
+//! Role-aware connection construction for the registry schema.
 
 use std::time::Duration;
 
 use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr};
 
-use crate::schema::ORG_SCHEMA;
+use crate::schema::REGISTRY_SCHEMA;
 
-/// The role a service connects with, per `SERVICE_AND_DATA_ARCHITECTURE.md`.
-///
-/// - [`DbRole::ReadWrite`]: the API server, the sole writer of the shared
-///   schema.
-/// - [`DbRole::ReadOnly`]: web tiers. The connection URL gains the Postgres
-///   startup option `default_transaction_read_only=on`, so every transaction
-///   on the pool is read-only unless a session explicitly (and audibly)
-///   overrides it.
+/// Database authority requested by a service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DbRole {
+    /// API server, migration job, and explicitly authorized background workers.
     ReadWrite,
+    /// Browser-facing read paths and reporting workers.
     ReadOnly,
 }
 
-/// Percent-encoded form of `-c default_transaction_read_only=on`.
-///
-/// Space and `=` are encoded so the value survives URL query parsing intact;
-/// the driver percent-decodes it before handing it to Postgres as the
-/// `options` startup parameter.
 const READ_ONLY_OPTIONS: &str = "options=-c%20default_transaction_read_only%3Don";
 
-/// Apply `role` to `database_url`.
-///
-/// [`DbRole::ReadWrite`] passes the URL through untouched. [`DbRole::ReadOnly`]
-/// appends the Postgres startup option `options=-c
-/// default_transaction_read_only=on` (percent-encoded), respecting any query
-/// string already present. Pure function; see the unit tests below.
+/// Apply the Postgres read-only startup option when requested.
 pub fn apply_role(database_url: &str, role: DbRole) -> String {
     match role {
         DbRole::ReadWrite => database_url.to_owned(),
@@ -43,11 +28,7 @@ pub fn apply_role(database_url: &str, role: DbRole) -> String {
     }
 }
 
-/// Connect to Postgres with `role` applied and the search path pinned to
-/// [`ORG_SCHEMA`].
-///
-/// Pool defaults are deliberately modest; services with special needs should
-/// still come through here and we widen the defaults, not fork them.
+/// Connect with bounded pool defaults and a deterministic schema search path.
 pub async fn connect(database_url: &str, role: DbRole) -> Result<DatabaseConnection, DbErr> {
     let mut options = ConnectOptions::new(apply_role(database_url, role));
     options
@@ -57,15 +38,11 @@ pub async fn connect(database_url: &str, role: DbRole) -> Result<DatabaseConnect
         .acquire_timeout(Duration::from_secs(10))
         .idle_timeout(Duration::from_secs(300))
         .sqlx_logging(false)
-        .set_schema_search_path(ORG_SCHEMA);
+        .set_schema_search_path(REGISTRY_SCHEMA);
     Database::connect(options).await
 }
 
-/// Verify the connection really is read-only; call at web-server startup.
-///
-/// Returns an error unless `current_setting('default_transaction_read_only')`
-/// is `on`. This turns a misconfigured URL (or a driver silently dropping the
-/// startup option) into a startup failure instead of a latent write path.
+/// Verify that a read-only pool did not silently lose its startup setting.
 pub async fn assert_read_only(conn: &DatabaseConnection) -> Result<(), DbErr> {
     use sea_orm::{ConnectionTrait, Statement};
 
@@ -82,8 +59,7 @@ pub async fn assert_read_only(conn: &DatabaseConnection) -> Result<(), DbErr> {
         Ok(())
     } else {
         Err(DbErr::Custom(format!(
-            "connection is not read-only: default_transaction_read_only = {setting:?} \
-             (expected \"on\"; web tiers must connect with DbRole::ReadOnly)"
+            "connection is not read-only: default_transaction_read_only = {setting:?}"
         )))
     }
 }
