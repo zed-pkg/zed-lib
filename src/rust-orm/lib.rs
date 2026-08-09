@@ -1,31 +1,28 @@
-//! Shared SeaORM data-access crate for the `zed-pkg` org.
+//! Canonical SeaORM data plane for the `zed-pkg` registry.
 //!
-//! This crate is the single place where zed-pkg services touch the shared
-//! Postgres schema (`zed_pkg`). It enforces the org's write/read split, defined
-//! in `SERVICE_AND_DATA_ARCHITECTURE.md` (in the org's `.github` repository):
+//! `zed-lib` owns the durable registry schema, migrations, entities, and named
+//! operations used by the API server, the MASH web server, migration jobs, and
+//! background workers. Services import this crate instead of copying SeaORM
+//! entities or constructing ad-hoc queries.
 //!
-//! - The Rust **API server** performs ALL writes to the shared schema. It
-//!   connects with [`DbRole::ReadWrite`].
-//! - The **web server** may read the shared schema but never write it. It
-//!   connects with [`DbRole::ReadOnly`], which forces
-//!   `default_transaction_read_only=on` at the Postgres session level, and
-//!   calls [`assert_read_only`] at startup to verify the setting took effect.
-//!   (A SELECT-only DB role is the second layer of the same defense; grants
-//!   are ops work, not this crate's.)
-//! - Consumers call **named query functions** from [`queries`]; the crate
-//!   never hands out a raw ORM session as its public contract. Web tiers may
-//!   only call functions in [`queries::read`].
+//! The registry and Shared Auth remain separate data planes:
 //!
-//! Schema access is strictly namespaced: every table lives under the
-//! [`ORG_SCHEMA`] (`zed_pkg`) schema, and connections set their search path
-//! accordingly.
+//! - this crate owns registry authorization and product data (`users`, `org`,
+//!   `projects`, `package`, memberships, invitations, and package settings);
+//! - Shared Auth owns authentication ceremonies and revocable sessions in its
+//!   customer-auth RDS instance;
+//! - a Shared Auth subject is mapped to exactly one registry user through
+//!   `users.shared_auth_subject`.
 
 mod connect;
+pub mod entities;
+pub mod migrations;
+pub mod models;
 pub mod queries;
 mod schema;
 
 pub use connect::{DbRole, apply_role, assert_read_only, connect};
-pub use schema::{ORG_SCHEMA, qualified};
+pub use migrations::{ACCOUNT_CONSOLE_MIGRATION, MigrationReport, migrate};
+pub use schema::{REGISTRY_SCHEMA, qualified};
 
-// Re-export SeaORM so consumers depend on one data layer, resolved once.
 pub use sea_orm;
