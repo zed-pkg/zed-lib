@@ -35,7 +35,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --all
+          mapfile -d '' rust_sources < <(find src/rust-orm -type f -name '*.rs' -print0 | sort -z)
+          test "${#rust_sources[@]}" -gt 0
+          rustfmt --edition 2024 "${rust_sources[@]}"
           if git diff --quiet; then
             exit 0
           fi
