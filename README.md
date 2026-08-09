@@ -1,105 +1,110 @@
-# zed-lib
+# zed-lib — moved to `zed-lib-core`
 
-Implementations of the [zed-pkg](https://github.com/zed-pkg) contract defined
-in [zed-interfaces](https://github.com/zed-pkg/zed-interfaces).
+> **Historical repository.** New development and releases have moved to
+> [`zed-pkg/zed-lib-core`](https://github.com/zed-pkg/zed-lib-core). This
+> repository remains available so existing commit pins, branches, issues, pull
+> requests, and audit links continue to resolve.
 
-```
-zed-interfaces   shape     types, serialization, validation
-      ▲
-      │ depends on
-      │
-zed-lib          behavior  resolution, planning, policy
-      ▲
-      │ depends on
-      │
-zed-cli, zed-api-server, zed-web-server, the front ends
-```
+`zed-lib-core` is the semantic merge of this repository and the core ORM lineage
+formerly published from [`zed-pkg/zed-orm-core`](https://github.com/zed-pkg/zed-orm-core).
+It preserves both Git histories and is the only repository-level release
+authority for the shared Zed library behavior, conformance corpus, and registry
+ORM.
 
-`zed-interfaces` answers *is this document well-formed?* — it is on the compile
-path of every service and client, so it stays cheap and free of opinion.
-`zed-lib` answers *what does it mean?* — the logic that composes those types
-into decisions.
+## Consumer migration
 
-## What is here today
+Change only the Git source. The language package names remain compatible.
 
-`resolve` — scheme-aware version resolution against registry metadata.
-`zed_interfaces::version::resolve` takes a bare list of version strings and so
-cannot know that a package declared itself `opaque`; resolving one of those
-through semver range algebra installs something its publisher never promised.
-This takes the whole `PackageMetadata`, lets the package's own `VersionScheme`
-decide how the requirement is read, and distinguishes the three ways resolution
-fails instead of collapsing them into `None`:
+| Consumer | Previous source | Canonical source/path |
+| --- | --- | --- |
+| Rust behavior crate `zed-lib` | `zed-pkg/zed-lib`, `src/rust` | `zed-pkg/zed-lib-core`, `src/rust` |
+| TypeScript `@zed-pkg/zed-lib` | `zed-pkg/zed-lib`, `src/ts` | `zed-pkg/zed-lib-core`, `src/ts` |
+| Dart `zed_lib` | `zed-pkg/zed-lib`, `src/dart` | `zed-pkg/zed-lib-core`, `src/dart` |
+| Language-neutral corpus | `zed-pkg/zed-lib`, `conformance` | `zed-pkg/zed-lib-core`, `conformance` |
 
-```rust
-use zed_lib::{ResolveError, latest_stable, resolve_version};
+Example Rust Git dependency after migration:
 
-let version = resolve_version(&metadata, "^1.2")?;   // "1.4.0", as published
-let newest = latest_stable(&metadata);               // ignores prereleases
+```toml
+zed-lib = {
+  git = "https://github.com/zed-pkg/zed-lib-core.git",
+  rev = "<reviewed-zed-lib-core-commit>"
+}
 ```
 
-| failure               | means                                              |
-| --------------------- | -------------------------------------------------- |
-| `no_versions`         | the package exists but has nothing installable      |
-| `invalid_requirement` | the requirement cannot mean anything here (`^1.x.y`, or a range against an opaque package) |
-| `unsatisfied`         | a good requirement nothing published satisfies      |
+The repository metadata inside the Rust, TypeScript, and Dart slices now points
+to `zed-lib-core`.
 
-## Three implementations, one corpus
+## Preserved merge history
 
-```
-zed-lib/
-  src/rust/            the crate (Cargo.toml lives here)
-  src/dart/            native Dart implementation (package:zed_lib)
-  src/ts/              native TypeScript implementation (@zed-pkg/zed-lib)
-  conformance/cases/   language-neutral corpus all three must pass
-  Cargo.toml           virtual workspace, members = ["src/rust"]
-  .zpkg.toml           one package, one slice per language + the corpus
+The two-parent history merge is:
+
+```text
+f27f72cc65640407409d38953c8d30ee4c95f3a6
 ```
 
-The Dart and TypeScript slices are **not bindings**. Each is a native
-implementation of the same algebra, and each runs
-[`conformance/cases/*.json`](conformance) — so "the CLI resolved 1.4.0 but the
-web UI offered 2.0.0" is a failing test in one of them rather than a support
-ticket.
+Parents:
 
-All three are dependency-free on purpose. `pub_semver` and npm's `semver` each
-implement a *different dialect* from Cargo's, and they disagree exactly where
-it hurts:
-
-| requirement | Cargo (and zed) | npm `semver` | `pub_semver` |
-| ----------- | --------------- | ------------ | ------------ |
-| `1.0.0`     | `>=1.0.0 <2.0.0` | exactly `1.0.0` | exactly `1.0.0` |
-| `1.2`       | `>=1.2.0 <2.0.0` | `>=1.2.0 <1.3.0` | — |
-| `1.2.*`     | `>=1.2.0 <1.3.0` | same | — |
-
-Three implementations of one contract cannot afford a translation layer whose
-edge cases nobody reads, so the algebra is written out in each language and the
-corpus proves they agree.
-
-## Migrating behavior out of zed-interfaces
-
-Behavior that lives in `zed-interfaces` today — `version` parsing, `excludes`
-matching, `language` detection — moves here one module at a time. Each move is
-a breaking change for the interface crate, so it is tracked as its own ticket
-and lands with its consumers updated. **Do not copy a module here while it still
-exists there**; depend on it until it moves, so the two can never disagree.
-
-## Development
-
-Sibling checkouts, like the rest of the org:
-
-```sh
-git clone https://github.com/zed-pkg/zed-interfaces
-git clone https://github.com/zed-pkg/zed-lib
-cd zed-lib
-
-cargo test                                        # Rust slice + corpus
-(cd src/dart && dart pub get && dart test)        # Dart slice + corpus
-(cd src/ts   && npm install && npm test)          # TypeScript slice + corpus
+```text
+430aafe24b6c3ab1263f1351ab4941545f592f19  zed-lib lineage
+a5dabf3685db94ffdf5ae30cb3b3e4cc1cce298f  zed-orm-core lineage
 ```
 
-Every slice depends on its `zed-interfaces` counterpart by path until
-`zed-interfaces` publishes `0.1.0`, at which point each becomes a plain version
-requirement.
+The conceptual fold is:
+
+```text
+9fdc5fed96b707b99b3b02e6541060831c3d70fd
+```
+
+Canonical certification merged through
+[`zed-lib-core#1`](https://github.com/zed-pkg/zed-lib-core/pull/1) as:
+
+```text
+171ee6a3ba82a492409ef86e27af793574942447
+```
+
+## Open predecessor work was not discarded
+
+### One-time invitation acceptance
+
+Predecessor [`zed-lib#7`](https://github.com/zed-pkg/zed-lib/pull/7) was ported
+into [`zed-lib-core#2`](https://github.com/zed-pkg/zed-lib-core/pull/2), merged
+as:
+
+```text
+79c30f65c676f6eb304effe2a7abf969f22f2da8
+```
+
+The canonical implementation retains one-time SHA-256 tokens, verified-email
+matching, generic non-enumerating failures, organization/project targets,
+atomic membership creation, concurrent replay protection, and no role
+downgrade. It additionally uses the canonical opaque ORM context, `zed_*` schema,
+revocation checks, and accepted-by evidence.
+
+### Registry data plane
+
+The substantive requirements from predecessor
+[`zed-lib#5`](https://github.com/zed-pkg/zed-lib/pull/5) are mapped and adapted
+in [`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3).
+
+The canonical port uses the shared `zed_*` schema and opaque read/write contexts.
+It retains upload/download/license/embedding operations and visibility-aware
+text/semantic search, while retiring the transitional branch's unprefixed
+schema, branch-owned migrations, raw SeaORM sessions, duplicate identity model,
+and unavailable pgvector assumptions.
+
+The complete item-by-item mapping is in
+[`PREDECESSOR_MIGRATION.md`](https://github.com/zed-pkg/zed-lib-core/blob/main/PREDECESSOR_MIGRATION.md).
+
+## Repository policy
+
+- Do not open new feature or release work here.
+- Do not publish a new package or repository-level release from this repository.
+- Open historical links remain available for audit and migration.
+- New bugs, features, and pull requests belong in
+  [`zed-pkg/zed-lib-core`](https://github.com/zed-pkg/zed-lib-core).
+- This repository may be archived only after the canonical registry-data-plane
+  port is merged and every unique predecessor issue or pull request has a
+  recorded canonical disposition.
 
 ## License
 
