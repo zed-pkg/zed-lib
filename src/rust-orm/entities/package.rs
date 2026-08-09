@@ -14,6 +14,13 @@ pub struct Model {
     pub visibility: String,
     #[sea_orm(column_type = "JsonBinary")]
     pub config: Json,
+    pub created_by_user_id: Option<Uuid>,
+    pub default_archive_format: String,
+    pub download_count: i64,
+    pub upload_count: i64,
+    pub first_public_at: Option<DateTimeWithTimeZone>,
+    pub visibility_changed_at: DateTimeWithTimeZone,
+    pub visibility_changed_by_user_id: Option<Uuid>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

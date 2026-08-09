@@ -7,12 +7,14 @@
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, Statement, TransactionTrait};
 
+use crate::registry_migration::{REGISTRY_FEATURES_MIGRATION, apply as apply_registry_features};
+
 /// Initial account-console expansion.
 pub const ACCOUNT_CONSOLE_MIGRATION: &str = "20260809_000001_account_console";
 /// Compatibility migration for legacy machine-token organization claims.
 pub const ORG_NAME_COMPAT_MIGRATION: &str = "20260809_000002_org_name_legacy_default";
 /// Latest migration in the canonical registry series.
-pub const LATEST_MIGRATION: &str = ORG_NAME_COMPAT_MIGRATION;
+pub const LATEST_MIGRATION: &str = REGISTRY_FEATURES_MIGRATION;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MigrationReport {
@@ -217,6 +219,10 @@ pub async fn migrate(conn: &DatabaseConnection) -> Result<MigrationReport, DbErr
         }
     }
 
+    if apply_registry_features(&txn).await? {
+        applied_versions.push(REGISTRY_FEATURES_MIGRATION);
+    }
+
     txn.commit().await?;
     Ok(MigrationReport {
         version: LATEST_MIGRATION,
@@ -263,6 +269,12 @@ mod tests {
         assert!(ORG_NAME_COMPAT_SQL.contains("SET DEFAULT ''"));
         assert!(ORG_NAME_COMPAT_SQL.contains("NEW.name := NEW.slug"));
         assert!(ORG_NAME_COMPAT_SQL.contains("BEFORE INSERT"));
-        assert_eq!(LATEST_MIGRATION, ORG_NAME_COMPAT_MIGRATION);
+        assert!(ORG_NAME_COMPAT_MIGRATION > ACCOUNT_CONSOLE_MIGRATION);
+    }
+
+    #[test]
+    fn newest_migration_is_reported_by_the_batch() {
+        assert_eq!(LATEST_MIGRATION, REGISTRY_FEATURES_MIGRATION);
+        assert!(REGISTRY_FEATURES_MIGRATION > ORG_NAME_COMPAT_MIGRATION);
     }
 }
