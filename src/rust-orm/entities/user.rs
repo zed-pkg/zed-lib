@@ -5,6 +5,9 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    /// Stable verified subject. The federated issuer and optional Supabase user
+    /// id are compatibility columns managed by raw, centralized registry
+    /// operations so older Shared Auth callers keep this entity shape.
     pub shared_auth_subject: String,
     pub email: Option<String>,
     pub display_name: Option<String>,
