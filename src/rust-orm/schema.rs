@@ -1,57 +1,35 @@
-//! The org's shared-schema namespace.
+//! Registry schema naming helpers.
 //!
-//! Shared definitions come from `oresoftware/k8s-libs-and-shared-defs`
-//! (imported as a zed package via `.zpkg.toml`); the schema is strictly
-//! namespaced per org, and for zed-pkg that namespace is [`ORG_SCHEMA`].
+//! The existing deployed registry tables live in `public`. The migration owner
+//! therefore preserves that namespace during the first ownership cutover. A
+//! future expand/backfill/contract migration may move the complete graph into a
+//! dedicated schema without making every service invent its own transition.
 
-/// The Postgres schema every shared table lives under.
-pub const ORG_SCHEMA: &str = "zed_pkg";
+/// Current schema containing the deployed registry tables.
+pub const REGISTRY_SCHEMA: &str = "public";
 
-/// Return `"<ORG_SCHEMA>.<table>"` for a bare table name.
-///
-/// # Panics
-///
-/// Panics if `table` is empty, contains whitespace, or contains a quote
-/// character — a table name is an identifier chosen by this org's code, never
-/// runtime input, so a bad one is a programming error and fails loudly.
-pub fn qualified(table: &str) -> String {
-    assert!(!table.is_empty(), "table name must not be empty");
-    assert!(
-        !table.chars().any(char::is_whitespace),
-        "table name must not contain whitespace: {table:?}"
-    );
-    assert!(
-        !table.contains(['"', '\'', '`']),
-        "table name must not contain quote characters: {table:?}"
-    );
-    format!("{ORG_SCHEMA}.{table}")
+/// Return a safely qualified registry table name.
+pub fn qualified(table: &str) -> Result<String, &'static str> {
+    if table.is_empty()
+        || table.trim() != table
+        || !table
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        return Err("invalid registry table name");
+    }
+    Ok(format!("{REGISTRY_SCHEMA}.{table}"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ORG_SCHEMA, qualified};
+    use super::*;
 
     #[test]
-    fn qualifies_with_org_schema() {
-        assert_eq!(qualified("packages"), "zed_pkg.packages");
-        assert!(qualified("packages").starts_with(ORG_SCHEMA));
-    }
-
-    #[test]
-    #[should_panic(expected = "must not be empty")]
-    fn rejects_empty() {
-        qualified("");
-    }
-
-    #[test]
-    #[should_panic(expected = "whitespace")]
-    fn rejects_whitespace() {
-        qualified("pack ages");
-    }
-
-    #[test]
-    #[should_panic(expected = "quote")]
-    fn rejects_quotes() {
-        qualified("packages\";drop_table_users;--");
+    fn qualifies_only_canonical_identifiers() {
+        assert_eq!(qualified("projects").unwrap(), "public.projects");
+        for invalid in ["", " projects", "Projects", "projects;drop", "project-name"] {
+            assert!(qualified(invalid).is_err(), "{invalid:?}");
+        }
     }
 }
