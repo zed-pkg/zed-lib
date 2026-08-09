@@ -4,9 +4,7 @@
 //! renaming their public URLs or destructive constraints. It adds the account
 //! console graph around them and records completion under an advisory lock.
 
-use sea_orm::{
-    ConnectionTrait, DatabaseConnection, DbErr, Statement, TransactionTrait,
-};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, Statement, TransactionTrait};
 
 /// Immutable migration identifier stored in `zed_schema_migrations`.
 pub const ACCOUNT_CONSOLE_MIGRATION: &str = "20260809_000001_account_console";

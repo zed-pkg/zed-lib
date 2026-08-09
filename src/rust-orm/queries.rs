@@ -312,7 +312,12 @@ pub mod read {
     }
 
     fn normalize_query(query: &str) -> String {
-        query.trim().chars().take(100).collect::<String>().to_lowercase()
+        query
+            .trim()
+            .chars()
+            .take(100)
+            .collect::<String>()
+            .to_lowercase()
     }
 
     fn searchable_project(model: &project::Model, query: &str) -> bool {
@@ -344,8 +349,10 @@ pub mod write {
     use std::time::SystemTime;
 
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-        DbErr, EntityTrait, QueryFilter, Statement, TransactionTrait,
+        ActiveModelTrait,
+        ActiveValue::Set,
+        ColumnTrait, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
+        Statement, TransactionTrait,
         prelude::{DateTimeUtc, DateTimeWithTimeZone, Json, Uuid},
     };
 
@@ -633,10 +640,7 @@ pub mod write {
         })
     }
 
-    async fn require_user(
-        conn: &DatabaseConnection,
-        subject: &str,
-    ) -> Result<user::Model, DbErr> {
+    async fn require_user(conn: &DatabaseConnection, subject: &str) -> Result<user::Model, DbErr> {
         user::Entity::find()
             .filter(user::Column::SharedAuthSubject.eq(subject))
             .one(conn)
@@ -786,7 +790,10 @@ mod tests {
         assert!(validate_slug("../admin").is_err());
         assert!(validate_visibility("private").is_ok());
         assert!(validate_visibility("world").is_err());
-        assert_eq!(normalize_email(" User@Example.COM ").unwrap(), "user@example.com");
+        assert_eq!(
+            normalize_email(" User@Example.COM ").unwrap(),
+            "user@example.com"
+        );
         assert!(normalize_email("not-an-email").is_err());
     }
 }
