@@ -16,13 +16,17 @@
 
 mod connect;
 pub mod entities;
+pub mod invitations;
 pub mod migrations;
 pub mod models;
 pub mod queries;
 mod schema;
 
 pub use connect::{DbRole, apply_role, assert_read_only, connect};
-pub use migrations::{ACCOUNT_CONSOLE_MIGRATION, MigrationReport, migrate};
+pub use migrations::{
+    ACCOUNT_CONSOLE_MIGRATION, LATEST_MIGRATION, MigrationReport, ORG_NAME_COMPAT_MIGRATION,
+    migrate,
+};
 pub use schema::{REGISTRY_SCHEMA, qualified};
 
 pub use sea_orm;
