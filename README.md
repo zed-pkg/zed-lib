@@ -83,14 +83,18 @@ revocation checks, and accepted-by evidence.
 ### Registry data plane
 
 The substantive requirements from predecessor
-[`zed-lib#5`](https://github.com/zed-pkg/zed-lib/pull/5) are mapped and adapted
-in [`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3).
+[`zed-lib#5`](https://github.com/zed-pkg/zed-lib/pull/5) were mapped and adapted
+in [`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3), merged as:
+
+```text
+d9a1f72baad87a0bbe256ad892d61d7a4fdd9135
+```
 
 The canonical port uses the shared `zed_*` schema and opaque read/write contexts.
-It retains upload/download/license/embedding operations and visibility-aware
-text/semantic search, while retiring the transitional branch's unprefixed
-schema, branch-owned migrations, raw SeaORM sessions, duplicate identity model,
-and unavailable pgvector assumptions.
+It retains typed upload/download/license/embedding operations and
+visibility-aware text/semantic search, while retiring the transitional branch's
+unprefixed schema, branch-owned migrations, raw SeaORM sessions, duplicate
+identity model, and unavailable pgvector assumptions.
 
 The complete item-by-item mapping is in
 [`PREDECESSOR_MIGRATION.md`](https://github.com/zed-pkg/zed-lib-core/blob/main/PREDECESSOR_MIGRATION.md).
@@ -102,9 +106,9 @@ The complete item-by-item mapping is in
 - Open historical links remain available for audit and migration.
 - New bugs, features, and pull requests belong in
   [`zed-pkg/zed-lib-core`](https://github.com/zed-pkg/zed-lib-core).
-- This repository may be archived only after the canonical registry-data-plane
-  port is merged and every unique predecessor issue or pull request has a
-  recorded canonical disposition.
+- This repository may now be archived as a read-only historical entry point;
+  every substantive open predecessor pull request has a merged canonical
+  disposition.
 
 ## License
 
