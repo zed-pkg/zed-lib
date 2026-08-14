@@ -153,4 +153,4 @@ jobs:
       # rather than a build artifact.
       - name: Conformance corpus
         working-directory: zed-lib/src/ts
-        run: node --test conformance.test.ts
+        run: npm test

@@ -34,6 +34,6 @@ tests with no build step:
 
 ```sh
 npm install
-npm test           # node --test conformance.test.ts, the shared corpus
+npm test           # Node strips TypeScript types and runs the shared corpus
 npm run typecheck
 ```
