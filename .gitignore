@@ -16,3 +16,7 @@ node_modules/
 # Slice tooling state
 src/dart/pubspec.lock
 src/ts/package-lock.json
+
+# Sanctioned scratch locations - AGENTS.md requires both, trailing-slash form
+tmp/
+temp/
